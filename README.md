@@ -1,35 +1,17 @@
-# sing-box
+版权所有 (C) 2022 nekohasekai <contact-sagernet@sekai.icu>
 
-The universal proxy platform.
+该程序是免费软件：您可以重新分发它和/或修改
+它遵循 GNU 通用公共许可证的条款，由
+自由软件基金会，许可证的版本 3，或
+（由您选择）任何更高版本。
 
-[![Packaging status](https://repology.org/badge/vertical-allrepos/sing-box.svg)](https://repology.org/project/sing-box/versions)
+分发此程序是希望它有用，
+但不提供任何保证； 甚至没有默示保证
+适销性或特定用途的适用性。 请参阅
+GNU 通用公共许可证了解更多详细信息。
 
-## Documentation
+您应该已收到 GNU 通用公共许可证的副本
+与这个程序一起。 如果没有，请参阅 <http://www.gnu.org/licenses/>。
 
-https://sing-box.sagernet.org
-
-## Support
-
-https://community.sagernet.org/c/sing-box/
-
-## License
-
-```
-Copyright (C) 2022 by nekohasekai <contact-sagernet@sekai.icu>
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-In addition, no derivative work may use the name or imply association
-with this application without prior consent.
-```
+此外，任何衍生作品均不得使用该名称或暗示关联
+未经事先同意而提出此申请。
