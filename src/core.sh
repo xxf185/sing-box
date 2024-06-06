@@ -84,9 +84,9 @@ change_list=(
     "更改用户名 (Username)"
 )
 servername_list=(
+    one-piece.com
     www.amazon.com
     www.ebay.com
-    www.paypal.com
     www.cloudflare.com
     dash.cloudflare.com
     aws.amazon.com
