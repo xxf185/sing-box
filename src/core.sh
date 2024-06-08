@@ -1099,7 +1099,7 @@ get() {
             }
             ;;
         hysteria2*)
-            net=hysteria2
+            net=hy2
             is_protocol=$net
             [[ ! $password ]] && password=$uuid
             json_str="users:[{password:\"$password\"}],$is_tls_json"
