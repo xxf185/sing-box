@@ -1098,8 +1098,8 @@ get() {
                 json_str="$is_users,${is_tls_json/alpn\:\[\"h3\"\],/}"
             }
             ;;
-        hysteria2*)
-            net=hysteria2
+        hy2*)
+            net=hy2
             is_protocol=$net
             [[ ! $password ]] && password=$uuid
             json_str="users:[{password:\"$password\"}],$is_tls_json"
@@ -1313,7 +1313,7 @@ info() {
         is_url="$is_protocol://$password@$is_addr:$port?type=tcp&security=tls&allowInsecure=1#$net"
         is_info_str=($is_protocol $is_addr $port $password tcp tls true)
         ;;
-    hy*)
+    hy2*)
         is_can_change=(0 1 4)
         is_info_show=(0 1 2 10 8 9 20)
         is_url="$is_protocol://$password@$is_addr:$port?alpn=h3&insecure=1#$net"
