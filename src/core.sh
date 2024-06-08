@@ -1313,7 +1313,7 @@ info() {
         is_url="$is_protocol://$password@$is_addr:$port?type=tcp&security=tls&allowInsecure=1#$net"
         is_info_str=($is_protocol $is_addr $port $password tcp tls true)
         ;;
-    hy2*)
+    hy*)
         is_can_change=(0 1 4)
         is_info_show=(0 1 2 10 8 9 20)
         is_url="$is_protocol://$password@$is_addr:$port?alpn=h3&insecure=1#$net"
