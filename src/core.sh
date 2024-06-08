@@ -1098,7 +1098,7 @@ get() {
                 json_str="$is_users,${is_tls_json/alpn\:\[\"h3\"\],/}"
             }
             ;;
-        hy2*)
+        hysteria2*)
             net=hy2
             is_protocol=$net
             [[ ! $password ]] && password=$uuid
