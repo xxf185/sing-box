@@ -1262,7 +1262,7 @@ info() {
     case $net in
     ws | tcp | h2 | quic | http*)
         if [[ $host ]]; then
-            is_color=45
+            is_color=44
             is_can_change=(0 1 2 3 5)
             is_info_show=(0 1 2 3 4 6 7 8)
             [[ $is_protocol == 'vmess' ]] && {
@@ -1327,7 +1327,7 @@ info() {
         is_info_str=($is_protocol $is_addr $port $uuid tls h3 true bbr)
         ;;
     reality)
-        is_color=41
+        is_color=44
         is_can_change=(0 1 5 9 10)
         is_info_show=(0 1 2 3 15 4 8 16 17 18)
         is_flow=xtls-rprx-vision
