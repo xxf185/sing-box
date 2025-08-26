@@ -1,3 +1,3 @@
 ```
-bash <(wget -qO- -o- https://github.com/xxf185/sing-box/raw/main/install.sh)
+bash <(wget -qO- -o- [https://raw.githubusercontent.com/xxf185/sing-box/refs/heads/master/install.sh)
 ```
