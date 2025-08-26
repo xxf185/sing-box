@@ -48,7 +48,7 @@ download() {
     caddy)
         name="Caddy"
         tmpfile=$tmpdir/caddy.tar.gz
-        # https://github.com/caddyserver/caddy/releases/download/v2.6.4/caddy_2.6.4_linux_amd64.tar.gz
+        # https://github.com/xxf185/caddy/releases/download/v2.6.4/caddy_2.6.4_linux_amd64.tar.gz
         link="https://github.com/${is_caddy_repo}/releases/download/${latest_ver}/caddy_${latest_ver:1}_linux_${is_arch}.tar.gz"
         download_file
         tar zxf $tmpfile -C $tmpdir
