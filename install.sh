@@ -288,7 +288,7 @@ exit_and_del_tmpdir() {
     [[ ! $1 ]] && {
         msg err "哦豁.."
         msg err "安装过程出现错误..."
-        echo -e "反馈问题) https://github.com/${is_sh_repo}/issues"
+        echo -e ""
         echo
         exit 1
     }
