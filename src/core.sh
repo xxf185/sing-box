@@ -1376,7 +1376,7 @@ info() {
         msg "$a $tt= \e[${is_color}m${is_info_str[$i]}\e[0m"
     done
     if [[ $is_new_install ]]; then
-        warn "首次安装请查看脚本帮助文档: $(msg_ul https://233boy.com/$is_core/$is_core-script/)"
+        warn "首次安装请查看脚本帮助文档"
     fi
     if [[ $is_url ]]; then
         msg "------------- ${info_list[12]} -------------"
