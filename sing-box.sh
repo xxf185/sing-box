@@ -1,6 +1,6 @@
 #!/bin/bash
 
 args=$@
-is_sh_ver=v1.13.6
+is_sh_ver=v1.13.7
 
 . /etc/sing-box/sh/src/init.sh
