@@ -1,7 +1,7 @@
 #!/bin/bash
 
-author=xxf185
-# github=https://github.com/xxf185/sing-box
+author=233boy
+# github=https://github.com/233boy/sing-box
 
 # bash fonts colors
 red='\e[31m'
@@ -58,11 +58,11 @@ _wget() {
     wget --no-check-certificate "$@"
 }
 
-# yum or apt-get
-cmd=$(type -P apt-get || type -P yum)
+# apt-get, yum, zypper or apk
+cmd=$(type -P apt-get || type -P yum || type -P zypper || type -P apk)
 
 # x64
-case $(arch) in
+case $(uname -m) in
 amd64 | x86_64)
     is_arch="amd64"
     ;;
@@ -78,20 +78,26 @@ is_core=sing-box
 is_core_name=sing-box
 is_core_dir=/etc/$is_core
 is_core_bin=$is_core_dir/bin/$is_core
-is_core_repo=xxf185/$is_core
+is_core_repo=SagerNet/$is_core
 is_conf_dir=$is_core_dir/conf
 is_log_dir=/var/log/$is_core
 is_sh_bin=/usr/local/bin/$is_core
 is_sh_dir=$is_core_dir/sh
 is_sh_repo=$author/$is_core
-is_pkg="wget unzip tar qrencode"
+is_pkg="wget unzip tar qrencode bash"
 is_config_json=$is_core_dir/config.json
 is_caddy_bin=/usr/local/bin/caddy
 is_caddy_dir=/etc/caddy
-is_caddy_repo=xxf185/caddy
+is_caddy_repo=caddyserver/caddy
 is_caddyfile=$is_caddy_dir/Caddyfile
 is_caddy_conf=$is_caddy_dir/$author
-is_caddy_service=$(systemctl list-units --full -all | grep caddy.service)
+is_systemd=$(type -P systemctl)
+is_openrc=$(type -P rc-service)
+if [[ $is_systemd ]]; then
+    is_caddy_service=$(systemctl list-units --full -all | grep caddy.service)
+elif [[ $is_openrc ]]; then
+    [[ -f /etc/init.d/caddy ]] && is_caddy_service=1
+fi
 is_http_port=80
 is_https_port=443
 
@@ -117,12 +123,13 @@ else
 fi
 if [[ -f $is_caddy_bin && -d $is_caddy_dir && $is_caddy_service ]]; then
     is_caddy=1
-    # fix caddy run; ver >= 2.8.2
-    [[ ! $(grep '\-\-adapter caddyfile' /lib/systemd/system/caddy.service) ]] && {
-        load systemd.sh
-        install_service caddy
-        systemctl restart caddy &
-    }
+    if [[ $is_systemd ]]; then
+        [[ -f /lib/systemd/system/caddy.service && ! $(grep '\-\-adapter caddyfile' /lib/systemd/system/caddy.service) ]] && {
+            load systemd.sh
+            install_service caddy
+            systemctl restart caddy &
+        }
+    fi
     is_caddy_ver=$($is_caddy_bin version | head -n1 | cut -d " " -f1)
     is_tmp_http_port=$(grep -E '^ {2,}http_port|^http_port' $is_caddyfile | grep -E -o [0-9]+)
     is_tmp_https_port=$(grep -E '^ {2,}https_port|^https_port' $is_caddyfile | grep -E -o [0-9]+)
