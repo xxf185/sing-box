@@ -51,11 +51,11 @@ dns_set() {
     fi
     is_dns_use_bak=$is_dns_use
     if [[ $is_dns_use == "none" ]]; then
-        cat <<<$(jq '.dns={}' $is_config_json) >$is_config_json
+        cat <<<$(jq '.|.dns={}|del(.route.default_domain_resolver)' $is_config_json) >$is_config_json
     else
         if [[ $is_dns_new ]]; then
             dns_set_server $is_dns_use
-            cat <<<$(jq '.dns.servers=[{type:"'$is_dns_type'",server:"'$is_dns_use'",domain_resolver:"local"},{tag:"local",type:"local"}]' $is_config_json) >$is_config_json
+            cat <<<$(jq '.|.dns.servers=[{tag:"dns",type:"'$is_dns_type'",server:"'$is_dns_use'",domain_resolver:"local"},{tag:"local",type:"local"}]|.route.default_domain_resolver="dns"' $is_config_json) >$is_config_json
         else
             cat <<<$(jq '.dns.servers=[{address:"'$is_dns_use'",address_resolver:"local"},{tag:"local",address:"local"}]' $is_config_json) >$is_config_json
         fi
