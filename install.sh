@@ -1,7 +1,7 @@
 #!/bin/bash
 
-author=xxf185
-# github=https://github.com/xxf185/sing-box
+author=233boy
+# github=https://github.com/233boy/sing-box
 
 # bash fonts colors
 red='\e[31m'
@@ -34,13 +34,15 @@ warn() {
 # root
 [[ $EUID != 0 ]] && err "当前非 ${yellow}ROOT用户.${none}"
 
-# yum or apt-get, ubuntu/debian/centos
-cmd=$(type -P apt-get || type -P yum)
-[[ ! $cmd ]] && err "此脚本仅支持 ${yellow}(Ubuntu or Debian or CentOS)${none}."
+# apt-get, yum, zypper or apk
+cmd=$(type -P apt-get || type -P yum || type -P zypper || type -P apk)
+[[ ! $cmd ]] && err "此脚本仅支持 ${yellow}(Ubuntu or Debian or CentOS or SUSE or Alpine)${none}."
 
-# systemd
-[[ ! $(type -P systemctl) ]] && {
-    err "此系统缺少 ${yellow}(systemctl)${none}, 请尝试执行:${yellow} ${cmd} update -y;${cmd} install systemd -y ${none}来修复此错误."
+# systemd or openrc
+is_systemd=$(type -P systemctl)
+is_openrc=$(type -P rc-service)
+[[ ! $is_systemd && ! $is_openrc ]] && {
+    err "此系统缺少 ${yellow}(systemctl 或 rc-service)${none}, 请安装 systemd 或确认 OpenRC 已启用."
 }
 
 # wget installed or none
@@ -63,13 +65,15 @@ is_core=sing-box
 is_core_name=sing-box
 is_core_dir=/etc/$is_core
 is_core_bin=$is_core_dir/bin/$is_core
-is_core_repo=xxf185/$is_core
+is_core_repo=SagerNet/$is_core
 is_conf_dir=$is_core_dir/conf
 is_log_dir=/var/log/$is_core
 is_sh_bin=/usr/local/bin/$is_core
 is_sh_dir=$is_core_dir/sh
 is_sh_repo=$author/$is_core
-is_pkg="wget tar"
+is_pkg="wget tar bash"
+# Alpine: gcompat provides glibc compatibility for prebuilt binaries
+[[ $cmd =~ apk ]] && is_pkg="$is_pkg gcompat jq"
 is_config_json=$is_core_dir/config.json
 tmp_var_lists=(
     tmpcore
@@ -141,15 +145,22 @@ install_pkg() {
     if [[ $cmd_not_found ]]; then
         pkg=$(echo $cmd_not_found | sed 's/,/ /g')
         msg warn "安装依赖包 >${pkg}"
-        $cmd install -y $pkg &>/dev/null
-        if [[ $? != 0 ]]; then
-            [[ $cmd =~ yum ]] && yum install epel-release -y &>/dev/null
-            $cmd update -y &>/dev/null
-            $cmd install -y $pkg &>/dev/null
-            [[ $? == 0 ]] && >$is_pkg_ok
+        if [[ $cmd =~ apk ]]; then
+            apk update &>/dev/null
+            apk add $pkg &>/dev/null
         else
-            >$is_pkg_ok
+            $cmd install -y $pkg &>/dev/null
+            if [[ $? != 0 ]]; then
+                [[ $cmd =~ yum ]] && yum install epel-release -y &>/dev/null
+                if [[ $cmd =~ zypper ]]; then
+                    $cmd --non-interactive refresh &>/dev/null
+                else
+                    $cmd update -y &>/dev/null
+                fi
+                $cmd install -y $pkg &>/dev/null
+            fi
         fi
+        [[ $? == 0 ]] && >$is_pkg_ok
     else
         >$is_pkg_ok
     fi
@@ -172,7 +183,7 @@ download() {
         is_ok=$is_sh_ok
         ;;
     jq)
-        link=https://github.com/xxf185/jq/releases/latest/download/jq-linux-$is_arch
+        link=https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-$is_arch
         name="jq"
         tmpfile=$tmpjq
         is_ok=$is_jq_ok
@@ -198,7 +209,11 @@ check_status() {
     # dependent pkg install fail
     [[ ! -f $is_pkg_ok ]] && {
         msg err "安装依赖包失败"
-        msg err "请尝试手动安装依赖包: $cmd update -y; $cmd install -y $pkg"
+        if [[ $cmd =~ apk ]]; then
+            msg err "请尝试手动安装依赖包: apk update; apk add $is_pkg"
+        else
+            msg err "请尝试手动安装依赖包: $cmd update -y; $cmd install -y $is_pkg"
+        fi
         is_fail=1
     }
 
@@ -288,7 +303,7 @@ exit_and_del_tmpdir() {
     [[ ! $1 ]] && {
         msg err "哦豁.."
         msg err "安装过程出现错误..."
-        echo -e ""
+        echo -e "反馈问题) https://github.com/${is_sh_repo}/issues"
         echo
         exit 1
     }
@@ -309,7 +324,7 @@ main() {
     # show welcome msg
     clear
     echo
-    echo "........... sing-box .........."
+    echo "........... $is_core_name script by $author .........."
     echo
 
     # start installing...
@@ -329,13 +344,22 @@ main() {
         msg warn "${yellow}本地获取安装脚本 > $PWD ${none}"
     }
 
-    timedatectl set-ntp true &>/dev/null
-    [[ $? != 0 ]] && {
-        is_ntp_on=1
-    }
+    if [[ $is_systemd ]]; then
+        timedatectl set-ntp true &>/dev/null
+        [[ $? != 0 ]] && {
+            is_ntp_on=1
+        }
+    fi
 
     # install dependent pkg
-    install_pkg $is_pkg &
+    if [[ $cmd =~ apk ]]; then
+        # Alpine: force install full versions to replace BusyBox applets
+        apk update &>/dev/null
+        apk add $is_pkg &>/dev/null
+        [[ $? == 0 ]] && >$is_pkg_ok
+    else
+        install_pkg $is_pkg &
+    fi
 
     # jq
     if [[ $(type -P jq) ]]; then
@@ -416,7 +440,7 @@ main() {
     # show a tips msg
     msg ok "生成配置文件..."
 
-    # create systemd service
+    # create service
     load systemd.sh
     is_new_install=1
     install_service $is_core &>/dev/null
@@ -427,6 +451,8 @@ main() {
     load core.sh
     # create a reality config
     add reality
+    # wait for background tasks (e.g., OpenRC service start)
+    wait
     # remove tmp dir and exit.
     exit_and_del_tmpdir ok
 }
