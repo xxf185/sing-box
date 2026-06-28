@@ -20,6 +20,7 @@ protocol_list=(
     Trojan-HTTPUpgrade-TLS
     VLESS-REALITY
     VLESS-HTTP2-REALITY
+    AnyTLS
     # Direct
     Socks
 )
@@ -91,6 +92,20 @@ servername_list=(
     dash.cloudflare.com
     aws.amazon.com
 )
+
+# shuf fallback for systems without shuf (e.g., Alpine BusyBox)
+if ! type -P shuf &>/dev/null; then
+    shuf() {
+        local min max n
+        while [[ $# -gt 0 ]]; do
+            case $1 in
+            -i) IFS=- read min max <<<"$2"; shift 2 ;;
+            -n) n=$2; shift 2 ;;
+            esac
+        done
+        echo $(( RANDOM % (max - min + 1) + min ))
+    }
+fi
 
 is_random_ss_method=${ss_method_list[$(shuf -i 4-6 -n1)]} # random only use ss2022
 is_random_servername=${servername_list[$(shuf -i 0-${#servername_list[@]} -n1) - 1]}
@@ -213,7 +228,7 @@ ask() {
         [[ $is_no_auto_tls ]] && {
             unset is_tmp_list
             for v in ${protocol_list[@]}; do
-                [[ $(grep -i tls$ <<<$v) ]] && is_tmp_list=(${is_tmp_list[@]} $v)
+                [[ $(grep -i "\-tls$" <<<$v) ]] && is_tmp_list=(${is_tmp_list[@]} $v)
             done
         }
         is_opt_msg="\n请选择协议:\n"
@@ -309,6 +324,8 @@ create() {
         if [[ $host ]]; then
             is_config_name=$2-${host}.json
             is_listen='listen: "127.0.0.1"'
+        elif [[ $is_anytls_domain ]]; then
+            is_config_name=$2-${is_anytls_domain}.json
         else
             is_config_name=$2-${port}.json
         fi
@@ -679,17 +696,27 @@ uninstall() {
     fi
     manage stop &>/dev/null
     manage disable &>/dev/null
-    rm -rf $is_core_dir $is_log_dir $is_sh_bin ${is_sh_bin/$is_core/sb} /lib/systemd/system/$is_core.service
-    sed -i "/alias $is_core=/d" /root/.bashrc
+    rm -rf $is_core_dir $is_log_dir $is_sh_bin ${is_sh_bin/$is_core/sb}
+    if [[ $is_systemd ]]; then
+        rm -f /lib/systemd/system/$is_core.service
+    elif [[ $is_openrc ]]; then
+        rm -f /etc/init.d/$is_core
+    fi
+    sed -i "/$is_core/d" /root/.bashrc
     # uninstall caddy; 2 is ask result
     if [[ $REPLY == '2' ]]; then
         manage stop caddy &>/dev/null
         manage disable caddy &>/dev/null
-        rm -rf $is_caddy_dir $is_caddy_bin /lib/systemd/system/caddy.service
+        if [[ $is_systemd ]]; then
+            rm -rf $is_caddy_dir $is_caddy_bin /lib/systemd/system/caddy.service
+        elif [[ $is_openrc ]]; then
+            rm -rf $is_caddy_dir $is_caddy_bin /etc/init.d/caddy
+        fi
     fi
     [[ $is_install_sh ]] && return # reinstall
     _green "\n卸载完成!"
-    msg ""
+    msg "脚本哪里需要完善? 请反馈"
+    msg "反馈问题) $(msg_ul https://github.com/${is_sh_repo}/issues)\n"
 }
 
 # manage run status
@@ -727,7 +754,21 @@ manage() {
         is_do_name_msg=$is_core_name
         ;;
     esac
-    systemctl $is_do $is_do_name
+    if [[ $is_systemd ]]; then
+        systemctl $is_do $is_do_name 2>/dev/null
+    elif [[ $is_openrc ]]; then
+        case $is_do in
+        enable)
+            rc-update add $is_do_name default 2>/dev/null
+            ;;
+        disable)
+            rc-update del $is_do_name default 2>/dev/null
+            ;;
+        *)
+            rc-service $is_do_name $is_do 2>/dev/null
+            ;;
+        esac
+    fi
     [[ $is_test_run && ! $is_new_install ]] && {
         sleep 2
         if [[ ! $(pgrep -f $is_run_bin) ]]; then
@@ -775,6 +816,9 @@ add() {
         trojan)
             is_new_protocol=Trojan
             ;;
+        anytls)
+            is_new_protocol=AnyTLS
+            ;;
         socks)
             is_new_protocol=Socks
             ;;
@@ -790,6 +834,14 @@ add() {
 
     # no prefer protocol
     [[ ! $is_new_protocol ]] && ask set_protocol
+
+    if [[ ${is_new_protocol,,} == 'anytls' ]]; then
+        is_core_major=$(echo "$is_core_ver" | cut -d. -f1)
+        is_core_minor=$(echo "$is_core_ver" | cut -d. -f2)
+        if [[ ${is_core_major:-0} -lt 1 || ${is_core_major:-0} -eq 1 && ${is_core_minor:-0} -lt 12 ]]; then
+            err "当前 sing-box 版本 ($is_core_ver) 不支持 AnyTLS，请先升级 sing-box core 到 1.12.0 或更高版本。"
+        fi
+    fi
 
     case ${is_new_protocol,,} in
     *-tls)
@@ -827,6 +879,12 @@ add() {
         is_use_door_addr=$3
         is_use_door_port=$4
         is_add_opts="[port] [remote_addr] [remote_port]"
+        ;;
+    anytls*)
+        is_use_port=$2
+        is_use_pass=$3
+        [[ $4 ]] && is_anytls_domain=$4
+        is_add_opts="[port] [password] [domain]"
         ;;
     socks)
         is_socks=1
@@ -923,6 +981,14 @@ add() {
         [[ $is_use_servername ]] && is_servername=$is_use_servername
         [[ $is_use_socks_user ]] && is_socks_user=$is_use_socks_user
         [[ $is_use_socks_pass ]] && is_socks_pass=$is_use_socks_pass
+    fi
+
+    # anytls with domain (ACME TLS)
+    if [[ $is_anytls_domain && ! $is_change && ! $is_gen ]]; then
+        get_ip
+        host=$is_anytls_domain
+        get host-test
+        host=
     fi
 
     if [[ $is_use_tls ]]; then
@@ -1067,6 +1133,11 @@ get() {
             is_socks_user=$username
             is_socks_pass=$password
 
+            # extract anytls ACME domain
+            [[ $is_protocol == 'anytls' ]] && {
+                is_anytls_domain=$(jq -r '(.inbounds[0].tls.certificate_provider.domain[0] // .inbounds[0].tls.acme.domain[0]) // empty' <<<$is_json_str 2>/dev/null)
+            }
+
             is_config_name=$is_config_file
 
             if [[ $is_caddy && $host && -f $is_caddy_conf/$host.conf ]]; then
@@ -1130,6 +1201,24 @@ get() {
             net=direct
             is_protocol=$net
             json_str="override_port:$door_port,override_address:\"$door_addr\""
+            ;;
+        anytls*)
+            net=anytls
+            is_protocol=$net
+            [[ ! $password ]] && password=$uuid
+            is_users="users:[{password:\"$password\"}]"
+            if [[ $is_anytls_domain ]]; then
+                # sing-box >= 1.14.0 uses certificate_provider; older uses acme
+                is_core_minor=$(echo "$is_core_ver" | cut -d. -f2)
+                if [[ ${is_core_minor:-0} -ge 14 ]]; then
+                    is_anytls_tls="tls:{enabled:true,certificate_provider:{type:\"acme\",domain:[\"$is_anytls_domain\"]}}"
+                else
+                    is_anytls_tls="tls:{enabled:true,acme:{domain:[\"$is_anytls_domain\"]}}"
+                fi
+            else
+                is_anytls_tls="${is_tls_json/alpn\:\[\"h3\"\],/}"
+            fi
+            json_str="$is_users,$is_anytls_tls"
             ;;
         socks*)
             net=socks
@@ -1227,11 +1316,13 @@ get() {
         bash <<<$is_install_sh
         ;;
     test-run)
-        systemctl list-units --full -all &>/dev/null
-        [[ $? != 0 ]] && {
-            _yellow "\n无法执行测试, 请检查 systemctl 状态.\n"
-            return
-        }
+        if [[ $is_systemd ]]; then
+            systemctl list-units --full -all &>/dev/null
+            [[ $? != 0 ]] && {
+                _yellow "\n无法执行测试, 请检查 systemctl 状态.\n"
+                return
+            }
+        fi
         is_no_manage_msg=1
         if [[ ! $(pgrep -f $is_core_bin) ]]; then
             _yellow "\n测试运行 $is_core_name ..\n"
@@ -1277,7 +1368,7 @@ info() {
             is_can_change=(0 1 2 3 5)
             is_info_show=(0 1 2 3 4 6 7 8)
             [[ $is_protocol == 'vmess' ]] && {
-                is_vmess_url=$(jq -c '{v:2,ps:'\"$net-$host\"',add:'\"$is_addr\"',port:'\"$is_https_port\"',id:'\"$uuid\"',aid:"0",net:'\"$net\"',host:'\"$host\"',path:'\"$path\"',tls:'\"tls\"'}' <<<{})
+                is_vmess_url=$(jq -c '{v:2,ps:'\"233boy-$net-$host\"',add:'\"$is_addr\"',port:'\"$is_https_port\"',id:'\"$uuid\"',aid:"0",net:'\"$net\"',host:'\"$host\"',path:'\"$path\"',tls:'\"tls\"'}' <<<{})
                 is_url=vmess://$(echo -n $is_vmess_url | base64 -w 0)
             } || {
                 [[ $is_protocol == "trojan" ]] && {
@@ -1286,7 +1377,7 @@ info() {
                     is_can_change=(0 1 2 3 4)
                     is_info_show=(0 1 2 10 4 6 7 8)
                 }
-                is_url="$is_protocol://$uuid@$host:$is_https_port?encryption=none&security=tls&type=$net&host=$host&path=$path#$net-$host"
+                is_url="$is_protocol://$uuid@$host:$is_https_port?encryption=none&security=tls&type=$net&host=$host&path=$path#233boy-$net-$host"
             }
             [[ $is_caddy ]] && is_can_change+=(11)
             is_info_str=($is_protocol $is_addr $is_https_port $uuid $net $host $path 'tls')
@@ -1308,34 +1399,36 @@ info() {
                 is_info_str+=(tls h3 true)
                 is_quic_add=",tls:\"tls\",alpn:\"h3\"" # cant add allowInsecure
             }
-            is_vmess_url=$(jq -c "{v:2,ps:\"${net}-$is_addr\",add:\"$is_addr\",port:\"$port\",id:\"$uuid\",aid:\"0\",net:\"$net\",type:\"$is_type\"$is_quic_add}" <<<{})
+            is_vmess_url=$(jq -c "{v:2,ps:\"233boy-${net}-$is_addr\",add:\"$is_addr\",port:\"$port\",id:\"$uuid\",aid:\"0\",net:\"$net\",type:\"$is_type\"$is_quic_add}" <<<{})
             is_url=vmess://$(echo -n $is_vmess_url | base64 -w 0)
         fi
         ;;
     ss)
         is_can_change=(0 1 4 6)
         is_info_show=(0 1 2 10 11)
-        is_url="ss://$(echo -n ${ss_method}:${ss_password} | base64 -w 0)@${is_addr}:${port}#$net-${is_addr}"
+        is_url="ss://$(echo -n ${ss_method}:${ss_password} | base64 -w 0)@${is_addr}:${port}#233boy-$net-${is_addr}"
         is_info_str=($is_protocol $is_addr $port $ss_password $ss_method)
         ;;
     trojan)
         is_insecure=1
         is_can_change=(0 1 4)
         is_info_show=(0 1 2 10 4 8 20)
-        is_url="$is_protocol://$password@$is_addr:$port?type=tcp&security=tls&allowInsecure=1#$net-$is_addr"
+        is_url="$is_protocol://$password@$is_addr:$port?type=tcp&security=tls&insecure=1&allowInsecure=1#233boy-$net-$is_addr"
         is_info_str=($is_protocol $is_addr $port $password tcp tls true)
         ;;
     hy*)
         is_can_change=(0 1 4)
         is_info_show=(0 1 2 10 8 9 20)
-        is_url="$is_protocol://$password@$is_addr:$port?alpn=h3&insecure=1#$net-$is_addr"
-        is_info_str=($is_protocol $is_addr $port $password tls h3 true)
+        # fix xray core for client use.
+        is_sha256=$(openssl x509 -noout -fingerprint -sha256 -in $is_core_dir/bin/tls.cer | sed 's/.*=//;s/://g')
+        is_url="$is_protocol://$password@$is_addr:$port?alpn=h3&insecure=1&allowInsecure=1&pinSHA256=$is_sha256#233boy-$net-$is_addr"
+        is_info_str=($is_protocol $is_addr $port $password tls h3 "true (设置, 固定证书>证书指纹(SHA-256): $is_sha256)")
         ;;
     tuic)
         is_insecure=1
         is_can_change=(0 1 4 5)
         is_info_show=(0 1 2 3 10 8 9 20 21)
-        is_url="$is_protocol://$uuid:$password@$is_addr:$port?alpn=h3&allow_insecure=1&congestion_control=bbr#$net-$is_addr"
+        is_url="$is_protocol://$uuid:$password@$is_addr:$port?alpn=h3&insecure=1&allowInsecure=1&congestion_control=bbr#233boy-$net-$is_addr"
         is_info_str=($is_protocol $is_addr $port $uuid $password tls h3 true bbr)
         ;;
     reality)
@@ -1350,7 +1443,20 @@ info() {
             is_info_show=(${is_info_show[@]/15/})
         }
         is_info_str=($is_protocol $is_addr $port $uuid $is_flow $is_net_type reality $is_servername chrome $is_public_key)
-        is_url="$is_protocol://$uuid@$is_addr:$port?encryption=none&security=reality&flow=$is_flow&type=$is_net_type&sni=$is_servername&pbk=$is_public_key&fp=chrome#$net-$is_addr"
+        is_url="$is_protocol://$uuid@$is_addr:$port?encryption=none&security=reality&flow=$is_flow&type=$is_net_type&sni=$is_servername&pbk=$is_public_key&fp=chrome#233boy-$net-$is_addr"
+        ;;
+    anytls)
+        is_can_change=(0 1 4)
+        if [[ $is_anytls_domain ]]; then
+            is_info_show=(0 1 2 10 8)
+            is_info_str=($is_protocol $is_anytls_domain $port $password tls)
+            is_url="anytls://$password@$is_anytls_domain:$port#233boy-$net-$is_anytls_domain"
+        else
+            is_insecure=1
+            is_info_show=(0 1 2 10 8 20)
+            is_info_str=($is_protocol $is_addr $port $password tls true)
+            is_url="anytls://$password@$is_addr:$port?insecure=1&allowInsecure=1#233boy-$net-$is_addr"
+        fi
         ;;
     direct)
         is_can_change=(0 1 7 8)
@@ -1361,7 +1467,7 @@ info() {
         is_can_change=(0 1 12 4)
         is_info_show=(0 1 2 19 10)
         is_info_str=($is_protocol $is_addr $port $is_socks_user $is_socks_pass)
-        is_url="socks://$(echo -n ${is_socks_user}:${is_socks_pass} | base64 -w 0)@${is_addr}:${port}#$net-${is_addr}"
+        is_url="socks://$(echo -n ${is_socks_user}:${is_socks_pass} | base64 -w 0)@${is_addr}:${port}#233boy-$net-${is_addr}"
         ;;
     esac
     [[ $is_dont_show_info || $is_gen || $is_dont_auto_exit ]] && return # dont show info
@@ -1376,7 +1482,7 @@ info() {
         msg "$a $tt= \e[${is_color}m${is_info_str[$i]}\e[0m"
     done
     if [[ $is_new_install ]]; then
-        warn "首次安装请查看脚本帮助文档"
+        warn "首次安装请查看脚本帮助文档: $(msg_ul https://233boy.com/$is_core/$is_core-script/)"
     fi
     if [[ $is_url ]]; then
         msg "------------- ${info_list[12]} -------------"
@@ -1401,7 +1507,9 @@ footer_msg() {
     ####### 要点13脸吗只会改我链接的小人 #######
     unset c n m s b
     msg "------------- END -------------"
-    msg ""
+    msg "关注(tg): $(msg_ul https://t.me/tg2333)"
+    msg "文档(doc): $(msg_ul https://233boy.com/$is_core/$is_core-script/)"
+    msg "推广(ads): 机场推荐($is_core_name services): $(msg_ul https://g${c}e${n}t${m}j${s}m${b}s.com/)\n"
     ####### 要点13脸吗只会改我链接的小人 #######
 }
 
@@ -1488,10 +1596,9 @@ update() {
 
 # main menu; if no prefer args.
 is_main_menu() {
-    msg "\n------------- sing-box -------------"
-    msg ""
+    msg "\n------------- $is_core_name script $is_sh_ver by $author -------------"
     msg "$is_core_name $is_core_ver: $is_core_status"
-    msg ""
+    msg "群组(Chat): $(msg_ul https://t.me/tg233boy)"
     is_main_start=1
     ask mainmenu
     case $REPLY in
@@ -1534,7 +1641,8 @@ is_main_menu() {
             _try_enable_bbr
             ;;
         2)
-            get log
+            load log.sh
+            log_set
             ;;
         3)
             get test-run
