@@ -1593,7 +1593,7 @@ update() {
 # main menu; if no prefer args.
 is_main_menu() {
     msg ""
-    msg "\n------------- sing-box -------------"
+    msg "------------- sing-box -------------"
     msg ""
     msg "$is_core_name $is_core_ver: $is_core_status"
     msg ""
