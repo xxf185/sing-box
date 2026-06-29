@@ -1592,7 +1592,9 @@ update() {
 
 # main menu; if no prefer args.
 is_main_menu() {
-    msg "\n------------- $is_core_name script $is_sh_ver by $author -------------"
+    msg ""
+    msg "\n------------- sing-box -------------"
+    msg ""
     msg "$is_core_name $is_core_ver: $is_core_status"
     msg ""
     is_main_start=1
