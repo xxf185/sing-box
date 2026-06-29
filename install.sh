@@ -324,7 +324,7 @@ main() {
     # show welcome msg
     clear
     echo
-    echo "........... $is_core_name script by $author .........."
+    echo "........... sing-box .........."
     echo
 
     # start installing...
