@@ -1495,7 +1495,7 @@ info() {
         msg "------------- no-auto-tls INFO -------------"
         msg "端口(port): $port"
         msg "路径(path): $path"
-        msg "\e[41m帮助(help)\e[0m: $(msg_ul https://233boy.com/$is_core/no-auto-tls/)"
+        msg ""
     fi
     footer_msg
 }
@@ -1586,7 +1586,7 @@ update() {
     fi
     download $is_update_name $is_new_ver
     msg "更新成功, 当前 $is_show_name 版本: $(_green $is_new_ver)\n"
-    msg "$(_green 请查看更新说明: https://github.com/$is_update_repo/releases/tag/$is_new_ver)\n"
+    msg ""
     [[ $is_update_name != 'sh' ]] && manage restart $is_update_name &
 }
 
@@ -1594,7 +1594,7 @@ update() {
 is_main_menu() {
     msg "\n------------- $is_core_name script $is_sh_ver by $author -------------"
     msg "$is_core_name $is_core_ver: $is_core_status"
-    msg "群组(Chat): $(msg_ul https://t.me/tg233boy)"
+    msg ""
     is_main_start=1
     ask mainmenu
     case $REPLY in
