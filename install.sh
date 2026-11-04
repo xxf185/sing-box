@@ -1,7 +1,7 @@
 #!/bin/bash
 
-author=xxf185
-# github=https://github.com/xxf185/sing-box
+author=233boy
+# github=https://github.com/233boy/sing-box
 
 # bash fonts colors
 red='\e[31m'
@@ -65,7 +65,7 @@ is_core=sing-box
 is_core_name=sing-box
 is_core_dir=/etc/$is_core
 is_core_bin=$is_core_dir/bin/$is_core
-is_core_repo=xxf185/$is_core
+is_core_repo=SagerNet/$is_core
 is_conf_dir=$is_core_dir/conf
 is_log_dir=/var/log/$is_core
 is_sh_bin=/usr/local/bin/$is_core
@@ -183,7 +183,7 @@ download() {
         is_ok=$is_sh_ok
         ;;
     jq)
-        link=https://github.com/xxf185/jq/releases/latest/download/jq-linux-$is_arch
+        link=https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-$is_arch
         name="jq"
         tmpfile=$tmpjq
         is_ok=$is_jq_ok
@@ -324,7 +324,7 @@ main() {
     # show welcome msg
     clear
     echo
-    echo "........... sing-box .........."
+    echo "........... $is_core_name script by $author .........."
     echo
 
     # start installing...
@@ -449,8 +449,8 @@ main() {
     mkdir -p $is_conf_dir
 
     load core.sh
-    # create a reality config
-    add reality
+    # create a config
+    add hy2
     # wait for background tasks (e.g., OpenRC service start)
     wait
     # remove tmp dir and exit.
